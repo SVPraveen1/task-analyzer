@@ -124,11 +124,27 @@ def get_score_explanation(task, score, all_tasks_map):
             due_date = datetime.strptime(task['due_date'], '%Y-%m-%d').date()
         else:
             due_date = task['due_date']
-        days_until_due = (due_date - date.today()).days
+            
+        # Re-use the business days logic (ideally refactor to shared function, but duplicating for safety in this snippet)
+        def get_bd(start, end):
+            if start > end: return (end - start).days
+            days = 0
+            current = start
+            holidays = ["01-01", "12-25", "07-04"] 
+            while current < end:
+                if current.weekday() < 5 and current.strftime("%m-%d") not in holidays:
+                    days += 1
+                current += timedelta(days=1)
+            return days
+
+        days_until_due = get_bd(date.today(), due_date)
+        
         if days_until_due < 0:
-            explanations.append("Overdue")
+            explanations.append(f"Overdue by {abs(days_until_due)} days")
         elif days_until_due == 0:
             explanations.append("Due today")
+        else:
+            explanations.append(f"Due in {days_until_due} business days")
     except:
         pass
 
