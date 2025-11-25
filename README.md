@@ -1,4 +1,4 @@
-# Smart Task Analyzer
+   # Smart Task Analyzer
 
 A mini-application that intelligently scores and prioritizes tasks based on urgency, importance, effort, and dependencies.
 
@@ -19,40 +19,6 @@ A mini-application that intelligently scores and prioritizes tasks based on urge
    ```bash
    pip install -r requirements.txt
    ```
-3. Run migrations to set up the database:
-   ```bash
-   python manage.py makemigrations
-   python manage.py migrate
-   ```
-4. Start the development server:
-   ```bash
-   python manage.py runserver
-   ```
-   The API will be available at `http://localhost:8000/api/tasks/analyze/`.
-
-### Frontend Setup
-
-1. Navigate to the `frontend` directory.
-2. Open `index.html` in your web browser.
-   - You can simply double-click the file or serve it using a local server (e.g., `python -m http.server` inside `frontend`).
-
-## Algorithm Explanation
-
-The core of the Smart Task Analyzer is the "Smart Balance" scoring algorithm, designed to surface the most impactful tasks while preventing "analysis paralysis." The scoring logic calculates a numerical priority score for each task based on four key dimensions. The algorithm is implemented in `backend/tasks/scoring.py`.
-
-**1. Urgency (Time Sensitivity)**
-The algorithm first evaluates the temporal pressure of a task. It calculates the difference between the `due_date` and today.
-
-- **Overdue Tasks**: These are treated as critical emergencies. Any task with a negative "days remaining" value receives a massive base score boost (+40) to ensure it jumps to the top of the queue immediately.
-- **Imminent Deadlines**: Tasks due today (+30) or within the next 2 days (+20) receive significant boosts.
-- **Approaching Deadlines**: Tasks due within a week get a moderate bump (+10).
-  This non-linear scaling ensures that as a deadline approaches, the task naturally climbs the priority list without user intervention.
-
-**2. Importance (Strategic Value)**
-User-defined importance (1-10 scale) acts as a multiplier. We multiply the importance rating by a factor of 3. This means a highly important task (10/10) contributes 30 points to the score, roughly equivalent to a task being due "today." This balance allows important long-term tasks to compete with urgent but trivial ones, preventing the "tyranny of the urgent."
-
-**3. Effort (Momentum & Quick Wins)**
-To encourage productivity momentum, the algorithm rewards "Quick Wins."
 
 - **Low Effort (< 2 hours)**: Tasks estimated to take less than 2 hours receive a +15 point bonus. This psychological trick encourages users to clear small tasks quickly, reducing mental clutter.
 - **High Effort (> 20 hours)**: Very large tasks receive a slight penalty (-5). This subtle "friction" encourages users to break large tasks down into smaller sub-tasks, as smaller tasks will naturally score higher.

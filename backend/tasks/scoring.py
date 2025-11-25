@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 def calculate_priority_score(task, all_tasks_map):
     """
@@ -18,16 +18,37 @@ def calculate_priority_score(task, all_tasks_map):
         due_date = date.today() # Default fallback
 
     today = date.today()
-    days_until_due = (due_date - today).days
+    
+    def get_business_days(start, end):
+        """Calculate business days between start and end date (inclusive-ish)."""
+        if start > end:
+            return (end - start).days # Return negative calendar days for overdue
+            
+        days = 0
+        current = start
+        # Hardcoded holidays for demonstration (Month-Day)
+        holidays = ["01-01", "12-25", "07-04"] 
+        
+        while current < end:
+            # 0=Monday, 6=Sunday. Skip 5 (Sat) and 6 (Sun)
+            if current.weekday() < 5:
+                # Check holiday
+                md = current.strftime("%m-%d")
+                if md not in holidays:
+                    days += 1
+            current += timedelta(days=1)
+        return days
+
+    days_until_due = get_business_days(today, due_date)
     
     if days_until_due < 0:
         score += 40 # Overdue - High Priority
     elif days_until_due == 0:
         score += 30 # Due Today
     elif days_until_due <= 2:
-        score += 20 # Due Soon
-    elif days_until_due <= 7:
-        score += 10 # Due this week
+        score += 20 # Due in <= 2 business days
+    elif days_until_due <= 5:
+        score += 10 # Due in <= 1 business week (5 days)
     
     # 2. Importance (1-10)
     importance = float(task.get('importance', 5))
