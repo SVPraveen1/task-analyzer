@@ -81,12 +81,64 @@ def calculate_priority_score(task, all_tasks_map):
         
     return round(score, 2)
 
-def detect_cycles(tasks):
+def detect_cycles(tasks, dependency_fetcher=None):
     """
     Detect circular dependencies in a list of tasks.
     Returns True if cycle detected, False otherwise.
+    
+    dependency_fetcher: Optional callable that takes a list of task IDs 
+                        and returns a list of task dictionaries (with 'id' and 'dependencies').
+                        Used to fetch dependencies that are not in the initial tasks list.
     """
+    # Build initial graph from input tasks
     graph = {t.get('id'): t.get('dependencies', []) for t in tasks if t.get('id') is not None}
+    
+    # Identify dependencies that are missing from the graph
+    missing_deps = set()
+    for deps in graph.values():
+        for dep_id in deps:
+            if dep_id not in graph:
+                missing_deps.add(dep_id)
+                
+    # Fetch missing dependencies if fetcher is provided
+    if dependency_fetcher and missing_deps:
+        # We might need to fetch recursively if the fetched tasks have more missing dependencies
+        # Use a queue or repeated fetching. 
+        # For simplicity and safety, let's do a breadth-first expansion until no new missing deps.
+        
+        processed_missing = set()
+        
+        while missing_deps:
+            # Get a batch of missing IDs that we haven't processed yet
+            batch = list(missing_deps - processed_missing)
+            if not batch:
+                break
+            
+            # Mark these as processed so we don't fetch them again, 
+            # even if they don't exist in the DB.
+            processed_missing.update(batch)
+                
+            fetched_tasks = dependency_fetcher(batch)
+            
+            # Add fetched tasks to graph
+            for t in fetched_tasks:
+                t_id = t.get('id')
+                if t_id:
+                    graph[t_id] = t.get('dependencies', [])
+            
+            # Check for new missing dependencies in the newly fetched tasks
+            new_missing = set()
+            for t in fetched_tasks:
+                for dep_id in t.get('dependencies', []):
+                    if dep_id not in graph and dep_id not in processed_missing:
+                        new_missing.add(dep_id)
+            
+            missing_deps.update(new_missing)
+            
+            # Safety break to prevent infinite loops if fetcher returns garbage or graph is huge
+            if len(graph) > 1000: # Arbitrary limit for safety
+                break
+
     visited = set()
     path = set()
 
@@ -100,7 +152,7 @@ def detect_cycles(tasks):
         path.add(node)
         
         for neighbor in graph.get(node, []):
-            # Only traverse if neighbor exists in our dataset
+            # Only traverse if neighbor exists in our graph
             if neighbor in graph:
                 if visit(neighbor):
                     return True

@@ -4,6 +4,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from datetime import date, timedelta
 from .scoring import calculate_priority_score, detect_cycles
+from .models import Task
 
 class ScoringLogicTests(TestCase):
     def test_urgency_scoring(self):
@@ -98,6 +99,40 @@ class ScoringLogicTests(TestCase):
         ]
         self.assertFalse(detect_cycles(tasks_ok))
 
+    def test_cycle_detection_with_fetcher(self):
+        # Cycle: Input(1) -> DB(2) -> Input(1)
+        tasks = [{'id': 1, 'dependencies': [2]}]
+        
+        def mock_fetcher(ids):
+            if 2 in ids:
+                return [{'id': 2, 'dependencies': [1]}]
+            return []
+            
+        self.assertTrue(detect_cycles(tasks, dependency_fetcher=mock_fetcher))
+        
+        # No Cycle: Input(1) -> DB(2) -> DB(3)
+        tasks_ok = [{'id': 1, 'dependencies': [2]}]
+        
+        def mock_fetcher_ok(ids):
+            if 2 in ids:
+                return [{'id': 2, 'dependencies': [3]}]
+            if 3 in ids:
+                return [{'id': 3, 'dependencies': []}]
+            return []
+            
+        self.assertFalse(detect_cycles(tasks_ok, dependency_fetcher=mock_fetcher_ok))
+
+    def test_cycle_detection_with_missing_dependency(self):
+        # Task 1 depends on 999 (which doesn't exist)
+        tasks = [{'id': 1, 'dependencies': [999]}]
+        
+        def mock_fetcher_missing(ids):
+            # 999 is requested, but we return empty list
+            return []
+            
+        # Should not hang and should return False (no cycle)
+        self.assertFalse(detect_cycles(tasks, dependency_fetcher=mock_fetcher_missing))
+
 class APITests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -119,5 +154,49 @@ class APITests(TestCase):
             { "id": 1, "title": "A", "due_date": "2025-01-01", "estimated_hours": 1, "importance": 5, "dependencies": [2] },
             { "id": 2, "title": "B", "due_date": "2025-01-01", "estimated_hours": 1, "importance": 5, "dependencies": [1] }
         ]
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_analyze_cycle_with_db_task(self):
+        # Create Task A in DB
+        task_a = Task.objects.create(
+            title="A", 
+            due_date=date.today(), 
+            estimated_hours=1, 
+            importance=5
+        )
+        
+        # Create Task B in Request, depending on A
+        # And update Task A to depend on B (simulated by B depending on A, and A depending on B? No.)
+        # Scenario: 
+        # DB: A (deps: [])
+        # Request: B (deps: [A]). AND Update A (deps: [B]).
+        # If we send a list with B and A, it's a local cycle, already caught.
+        
+        # Scenario:
+        # DB: A (deps: [B]). But B doesn't exist yet? No, B must exist for A to depend on it.
+        # So let's create B in DB too.
+        task_b = Task.objects.create(
+            title="B",
+            due_date=date.today(),
+            estimated_hours=1,
+            importance=5
+        )
+        # A depends on B
+        task_a.dependencies.add(task_b)
+        
+        # Request: Update B to depend on A.
+        data = [
+            {
+                "id": task_b.id,
+                "title": "B",
+                "due_date": str(date.today()),
+                "estimated_hours": 1,
+                "importance": 5,
+                "dependencies": [task_a.id]
+            }
+        ]
+        
+        # Cycle: B -> A -> B
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

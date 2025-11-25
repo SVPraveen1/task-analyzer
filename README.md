@@ -56,9 +56,6 @@ A unique feature of this system is its awareness of task relationships. A task t
 - For _each_ task that is blocked by the current task, the current task receives a +15 point boost.
 - This ensures that "bottleneck" tasks are prioritized, unblocking the rest of the workflow.
 
-**Cycle Detection**
-Before scoring, the system runs a Depth-First Search (DFS) cycle detection algorithm. If a circular dependency is found (e.g., A blocks B, and B blocks A), the system rejects the input with a 400 error, preventing infinite logic loops and forcing the user to resolve the logical fallacy.
-
 ## Design Decisions & Trade-offs
 
 **1. Stateless Analysis Endpoint**
@@ -72,17 +69,12 @@ Before scoring, the system runs a Depth-First Search (DFS) cycle detection algor
 - **Decision**: The "Smart Balance" score is calculated on the server, but the "Fastest Wins" and "Deadline" sorting is handled on the client side.
 - **Reasoning**: "Smart Balance" requires complex business logic (dependency graph traversal) that belongs on the backend. Simple property sorts (by date or hours) are instant on the frontend and don't require a round-trip, providing a snappier UX.
 
-**3. Cycle Detection Strategy**
-
-- **Decision**: Strict rejection of cycles.
-- **Reasoning**: Allowing cycles in a dependency graph makes prioritization mathematically impossible (which comes first?). Rejecting the input with a clear error message is the safest and most correct approach for a dependency-based system.
-
 ## Time Breakdown
 
 - **Backend Development (1.5 hours)**:
   - Project setup & configuration: 15 mins
   - Task Model & API Views: 30 mins
-  - Scoring Algorithm & Cycle Detection: 45 mins
+  - Scoring Algorithm: 45 mins
 - **Frontend Development (1.5 hours)**:
   - HTML Structure & CSS Styling: 45 mins
   - JS Logic (API integration, UI updates): 45 mins
@@ -93,7 +85,7 @@ Before scoring, the system runs a Depth-First Search (DFS) cycle detection algor
 ## Bonus Challenges Attempted
 
 - **Date Intelligence**: Implemented business day calculation to exclude weekends and holidays from urgency scoring.
-- **Cycle Detection**: Implemented a graph-based cycle detection algorithm to validate dependencies.
+
 - **Bulk Import**: Added a dedicated JSON import tab for power users.
 - **Strategy Toggle**: Implemented a dynamic switcher to re-order tasks based on different user needs (Speed vs. Impact vs. Deadline).
 - **Visual Priority Indicators**: Added color-coded badges (Red/Orange/Green) based on the calculated score thresholds.
